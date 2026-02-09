@@ -1,6 +1,11 @@
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
 import streamlit as st
-from .state import init_session_state
-from .orchestrator import run_turn
+from pm_copilot.state import init_session_state
+from pm_copilot.orchestrator import run_turn
 
 
 st.set_page_config(page_title="PM Co-Pilot", layout="wide")
