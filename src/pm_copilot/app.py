@@ -10,6 +10,20 @@ from pm_copilot.orchestrator import run_turn
 
 st.set_page_config(page_title="PM Co-Pilot", layout="wide")
 
+# Prevent sidebar expander labels from truncating
+st.markdown(
+    """
+    <style>
+    [data-testid="stSidebar"] [data-testid="stExpander"] summary p {
+        white-space: normal;
+        overflow: visible;
+        text-overflow: unset;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
 # --- Initialize ---
 init_session_state()
 
@@ -31,6 +45,7 @@ with st.sidebar:
     # Assumption register display
     st.divider()
     st.subheader("Assumptions")
+    st.caption("🔴 High impact, unvalidated · 🟡 High impact, some evidence · 🟢 Lower impact")
     assumptions = st.session_state.assumption_register
     if assumptions:
         for aid, a in sorted(assumptions.items()):
@@ -40,7 +55,8 @@ with st.sidebar:
                 icon = "🟡"
             else:
                 icon = "🟢"
-            with st.expander(f"{icon} {a['id']}: {a['claim'][:50]}..."):
+            with st.expander(f"{icon} {a['id']}: {a['claim']}", expanded=False):
+                st.markdown(f"**{a['claim']}**")
                 st.write(f"**Type:** {a['type']}")
                 st.write(f"**Impact:** {a['impact']} | **Confidence:** {a['confidence']}")
                 st.write(f"**Status:** {a['status']}")
@@ -54,7 +70,8 @@ with st.sidebar:
     st.subheader("Document Skeleton")
     skeleton = st.session_state.document_skeleton
     if skeleton["problem_statement"]:
-        st.write(f"**Problem:** {skeleton['problem_statement'][:100]}...")
+        with st.expander("**Problem Statement**", expanded=True):
+            st.write(skeleton["problem_statement"])
     if skeleton["stakeholders"]:
         st.write(f"**Stakeholders:** {len(skeleton['stakeholders'])} identified")
     if any(skeleton["success_metrics"].values()):
