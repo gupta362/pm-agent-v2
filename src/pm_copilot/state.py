@@ -40,3 +40,4 @@ def init_session_state():
             "enrichment_count": 0,     # How many times we've enriched (cap at 3)
         }
         st.session_state.latest_artifact = None  # Rendered markdown from generate_artifact
+        st.session_state.pending_questions = None  # Questions from latest assistant response for checkbox UI

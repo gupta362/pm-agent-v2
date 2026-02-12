@@ -1,3 +1,4 @@
+import re
 import sys
 from pathlib import Path
 
@@ -6,6 +7,13 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import streamlit as st
 from pm_copilot.state import init_session_state
 from pm_copilot.orchestrator import run_turn
+
+
+def extract_questions(text):
+    """Extract numbered questions from assistant response."""
+    pattern = r"\*{0,2}Question\s+(\d+)\*{0,2}[:\s]*\*{0,2}([^\n*]+)"
+    matches = re.findall(pattern, text)
+    return [(num, title.strip()) for num, title in matches]
 
 
 st.set_page_config(page_title="PM Co-Pilot", layout="wide")
@@ -113,12 +121,55 @@ for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
 
+# Show question checkboxes if the last assistant response had questions
+pending_qs = st.session_state.pending_questions
+if pending_qs:
+    st.markdown("**Which questions would you like to respond to?**")
+    for num, title in pending_qs:
+        st.checkbox(
+            f"Question {num}: {title}",
+            value=True,
+            key=f"respond_q{num}",
+        )
+
 # Chat input
 if user_input := st.chat_input("Describe your problem, opportunity, or idea..."):
+    # Build orchestrator input with question selection context
+    if pending_qs:
+        selected = []
+        for num, title in pending_qs:
+            if st.session_state.get(f"respond_q{num}", True):
+                selected.append(num)
+        # Only add context if user deselected some questions
+        if selected and len(selected) < len(pending_qs):
+            labels = ", ".join(f"Question {n}" for n in selected)
+            orchestrator_input = f"[User is responding to {labels}]\n\n{user_input}"
+        else:
+            orchestrator_input = user_input
+        # Clean up checkbox state
+        for num, _ in pending_qs:
+            st.session_state.pop(f"respond_q{num}", None)
+        st.session_state.pending_questions = None
+    else:
+        orchestrator_input = user_input
+
     with st.chat_message("user"):
         st.markdown(user_input)
 
     with st.chat_message("assistant"):
         with st.spinner("Thinking..."):
-            response = run_turn(user_input)
+            response = run_turn(orchestrator_input)
         st.markdown(response)
+
+    # If user selectively responded, store clean version for display history
+    if orchestrator_input != user_input:
+        # run_turn stored orchestrator_input; replace with clean version
+        for msg in reversed(st.session_state.messages):
+            if msg["role"] == "user" and msg["content"] == orchestrator_input:
+                msg["content"] = user_input
+                break
+
+    # Detect questions in new response for next turn's checkboxes
+    questions = extract_questions(response)
+    st.session_state.pending_questions = questions if questions else None
+    st.rerun()
